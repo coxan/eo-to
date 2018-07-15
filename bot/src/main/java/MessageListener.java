@@ -23,6 +23,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MessageListener extends ListenerAdapter {
     private static final int DEFAULT_RANGE = 100;
@@ -62,16 +63,27 @@ public class MessageListener extends ListenerAdapter {
         String command = input.substring(1).toLowerCase();
         if (input.startsWith("!")){
             if (command.startsWith("roll")){
-                int range = DEFAULT_RANGE;
+                long range = DEFAULT_RANGE;
                 if (command.length() > 5 && StringUtils.isNumeric(command.substring(5))) {
-                    range = Integer.parseInt(command.substring(5));
+                    range = Long.parseLong(command.substring(5));
                     if (range > 0){
-                        channel.sendMessage(String.format("%s", new Random().nextInt(range))).queue();
+                        channel.sendMessage(String.format("%s", ThreadLocalRandom.current().nextLong(range))).queue();
                     }else{
                         channel.sendMessage("Range must be an integer larger than 0.").queue();
                     }
                 }else{
-                    channel.sendMessage(String.format("%s", new Random().nextInt(range))).queue();
+                    boolean isNumber = true;
+                    for (char x : command.substring(5).toCharArray()){
+                        if (!"0123456789.".contains(String.valueOf(x))) {
+                            isNumber = false;
+                        }
+                    }
+
+                    if (isNumber){
+                        channel.sendMessage("Range must be an integer larger than 0.").queue();
+                    }else{
+                        channel.sendMessage(String.format("%s", ThreadLocalRandom.current().nextLong(range))).queue();
+                    }
                 }
             }else if (command.startsWith("poem")) {
                 channel.sendMessage("").queue();
@@ -125,6 +137,8 @@ public class MessageListener extends ListenerAdapter {
                 channel.sendMessage("```!roll [limit] - rolls a number from 0 to 100\n" +
                         "!search [query] - fetches an image from google\n" +
                         "!help - this```").queue();
+            }else if (command.startsWith("communism")){
+                channel.sendMessage("Profits are the unpaid wages of the workers ").queue();
             }
         }
     }
@@ -137,7 +151,7 @@ public class MessageListener extends ListenerAdapter {
 
     private File search(String query) throws IOException {
         String key = "AIzaSyAHf4BvhDOHJwb9iPtLLvNW9sKKKTceWjs";
-        String qry = query;
+        String qry = query.replace(" ", "+");
         String cx  = "017261301791384958793:r4g8kzsv5ty";
         String fileType = "png,jpg";
         String searchType = "image";
@@ -158,20 +172,22 @@ public class MessageListener extends ListenerAdapter {
                 break;
             }
             File file = new File(String.format(
-                    "%s/%s",
+                    "%s/imageCache/%s",
                     System.getProperty("user.dir"),
                     path.substring(path.lastIndexOf("/")+1)
             ));
 
-            try {
-                FileUtils.copyURLToFile(
-                        new URL(path),
-                        file,
-                        1000,
-                        1000
-                );
-            } catch (IOException e) {
-                System.err.println("Something went wrong with the image.");
+            if (!file.exists()) {
+                try {
+                    FileUtils.copyURLToFile(
+                            new URL(path),
+                            file,
+                            1000,
+                            1000
+                    );
+                } catch (IOException e) {
+                    System.err.println("Something went wrong with the image.");
+                }
             }
 
             if (file.length() < Message.MAX_FILE_SIZE
