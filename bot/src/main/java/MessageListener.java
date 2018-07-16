@@ -163,6 +163,12 @@ public class MessageListener extends ListenerAdapter {
         GResults results = new Gson().fromJson(br, GResults.class);
         conn.disconnect();
 
+        String acceptedChars = "\\/:*\"<>|";
+        String queryFileName = query;
+        for (char x : acceptedChars.toCharArray()){
+            queryFileName = queryFileName.replace(x, Character.MIN_VALUE);
+        }
+
         File result = null;
         for (int i=0; i < 10; i++) {
             String path = "";
@@ -174,7 +180,7 @@ public class MessageListener extends ListenerAdapter {
             File file = new File(String.format(
                     "%s/imageCache/%s - %s",
                     System.getProperty("user.dir"),
-                    query.replaceAll("[^a-zA-Z]", ""),
+                    queryFileName,
                     path.substring(path.lastIndexOf("."))
             ));
 
