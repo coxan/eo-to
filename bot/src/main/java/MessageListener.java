@@ -172,9 +172,10 @@ public class MessageListener extends ListenerAdapter {
                 break;
             }
             File file = new File(String.format(
-                    "%s/imageCache/%s",
+                    "%s/imageCache/%s - %s",
                     System.getProperty("user.dir"),
-                    path.substring(path.lastIndexOf("/")+1)
+                    query.replaceAll("[^a-zA-Z]", ""),
+                    path.substring(path.lastIndexOf("."))
             ));
 
             if (!file.exists()) {
