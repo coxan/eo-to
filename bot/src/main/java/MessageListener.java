@@ -178,10 +178,9 @@ public class MessageListener extends ListenerAdapter {
                 break;
             }
             File file = new File(String.format(
-                    "%s/imageCache/%s - %s%s",
+                    "%s/imageCache/%s%s",
                     System.getProperty("user.dir"),
                     queryFileName,
-                    path.substring(path.lastIndexOf("/")+1, path.lastIndexOf(".")),
                     path.substring(path.lastIndexOf("."))
             ));
 
