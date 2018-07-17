@@ -1,3 +1,16 @@
+import com.github.jreddit.entity.Submission;
+import com.github.jreddit.oauth.RedditOAuthAgent;
+import com.github.jreddit.oauth.RedditToken;
+import com.github.jreddit.oauth.app.RedditApp;
+import com.github.jreddit.oauth.app.RedditInstalledApp;
+import com.github.jreddit.oauth.client.RedditClient;
+import com.github.jreddit.oauth.client.RedditHttpClient;
+import com.github.jreddit.oauth.exception.RedditOAuthException;
+import com.github.jreddit.parser.entity.Thing;
+import com.github.jreddit.parser.exception.RedditParseException;
+import com.github.jreddit.parser.listing.SubmissionsListingParser;
+import com.github.jreddit.request.retrieval.submissions.SubmissionsOfSubredditRequest;
+import com.github.jreddit.retrieval.params.SubmissionSort;
 import com.google.gson.Gson;
 import com.jagrosh.jdautilities.menu.Paginator;
 import net.dv8tion.jda.core.AccountType;
@@ -12,6 +25,7 @@ import net.dv8tion.jda.core.hooks.ListenerAdapter;
 import net.dv8tion.jda.core.requests.restaction.MessageAction;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.impl.client.HttpClientBuilder;
 
 import javax.security.auth.login.LoginException;
 import java.io.BufferedReader;
@@ -29,16 +43,10 @@ public class MessageListener extends ListenerAdapter {
     private static final int DEFAULT_RANGE = 100;
     private List<Coffee> coffeeList = new ArrayList<>();
     private Paginator.Builder pb;
-
-    private void init(){
-        for (File x : new File("").listFiles()){
-            coffeeList.add(new Coffee("succducc", new File("")));
-        }
-    }
+    private SubmissionsOfSubredditRequest request;
 
     public static void main(String[] args)
-            throws LoginException, RateLimitedException, InterruptedException
-    {
+            throws LoginException, RateLimitedException, InterruptedException {
         JDA jda = new JDABuilder(AccountType.BOT)
                 .setToken("NDY3NTUzOTA4MDU1NjA1MjU4.Diuv1Q.JF2PawTZJYIlUaBMKCZMWybe35M")
                 .buildBlocking();
@@ -78,7 +86,6 @@ public class MessageListener extends ListenerAdapter {
                             isNumber = false;
                         }
                     }
-
                     if (isNumber){
                         channel.sendMessage("Range must be an integer larger than 0.").queue();
                     }else{
@@ -136,17 +143,22 @@ public class MessageListener extends ListenerAdapter {
             }else if (command.startsWith("help")){
                 channel.sendMessage("```!roll [limit] - rolls a number from 0 to 100\n" +
                         "!search [query] - fetches an image from google\n" +
-                        "!help - this```").queue();
+                        "!memes - gets a meme" +
+                        "!help - this" +
+                        "```"
+                ).queue();
             }else if (command.startsWith("communism")){
                 channel.sendMessage("Profits are the unpaid wages of the workers ").queue();
+            }else if (command.startsWith("memes")){
+                try {
+                    channel.sendFile(memes()).queue();
+                } catch (RedditOAuthException e) {
+                    System.err.println("Error: Unable to authenticate with reddit.");
+                } catch (RedditParseException e) {
+                    System.err.println("Error: Unable to parse reddit reponses.");
+                }
             }
         }
-    }
-
-
-    private MessageAction reply(CharSequence message, MessageChannel channel){
-        Message m = new MessageBuilder().append(message).build();
-        return channel.sendMessage(m);
     }
 
     private File search(String query) throws IOException {
@@ -188,9 +200,7 @@ public class MessageListener extends ListenerAdapter {
                 try {
                     FileUtils.copyURLToFile(
                             new URL(path),
-                            file,
-                            1000,
-                            1000
+                            file
                     );
                 } catch (IOException e) {
                     System.err.println("Something went wrong with the image.");
@@ -216,5 +226,89 @@ public class MessageListener extends ListenerAdapter {
         }
 
         return result;
+    }
+
+
+    public File memes() throws RedditOAuthException, RedditParseException {
+        System.out.println("memes is run");
+        String userAgent = "eo-to";
+        String clientID = "0BlY1z2yAJmdRg";
+        String redirectURI = "https://github.com/coxan/eo-to";
+
+        RedditApp redditApp = new RedditInstalledApp(clientID, redirectURI);
+        RedditOAuthAgent agent = new RedditOAuthAgent(userAgent, redditApp);
+        RedditClient client = new RedditHttpClient(userAgent, HttpClientBuilder.create().build());
+        RedditToken token = agent.tokenAppOnly(false);
+        SubmissionsListingParser parser = new SubmissionsListingParser();
+
+        request = (SubmissionsOfSubredditRequest)
+                new SubmissionsOfSubredditRequest("memes", com.github.jreddit.request.retrieval.param.SubmissionSort.HOT)
+                        .setLimit(50);
+        List<com.github.jreddit.parser.entity.Submission> submissions = parser.parse(client.get(token, request));
+
+        File meme = new File(String.format("%s/default", System.getProperty("user.dir")));
+        if (!meme.exists()) {
+            try {
+                meme.createNewFile();
+            }catch(IOException e){
+                System.err.println("Error: file cannot be created");
+            }
+        }
+
+        String url = "";
+        Thing thing = null;
+
+        while (meme.exists()) {
+            for (com.github.jreddit.parser.entity.Submission submission : submissions){
+                url = submission.getURL();
+                if (!submission.getURL().isEmpty() && makeName(url) != null){
+                    meme = new File(makeName(url));
+                    if (!meme.exists()){
+                        System.out.println(meme.getAbsolutePath());
+                        break;
+                    }
+                }
+                thing = new Thing(submission.getFullName()) {
+                    @Override
+                    public int compareTo(Thing o) {
+                        return 0;
+                    }
+                };
+            }
+            refresh(thing);
+        }
+
+        try {
+            FileUtils.copyURLToFile(new URL(url), meme);
+        } catch (IOException e) {
+            System.err.println("URL is invalid");
+        }
+
+        return meme;
+    }
+
+    private String makeName(String input){
+        String fileName = null;
+        if (input.startsWith("https://i.redd.it/") && input.contains("/")) {
+            fileName = String.format(
+                    "%s/%s",
+                    System.getProperty("user.dir"),
+                    input.substring(input.lastIndexOf('/')+1
+                    ));
+        }
+
+        return fileName;
+    }
+
+    private void refresh(Thing thing){
+        if (thing != null) {
+            request = (SubmissionsOfSubredditRequest)
+                    new SubmissionsOfSubredditRequest(
+                            "memes",
+                            com.github.jreddit.request.retrieval.param.SubmissionSort.HOT
+                    )
+                            .setLimit(100)
+                            .setAfter(thing);
+        }
     }
 }

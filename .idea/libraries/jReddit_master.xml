@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="jReddit-master">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../jReddit-master.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/../jReddit-master.jar!/" />
+    </SOURCES>
+  </library>
+</component>
